@@ -6,9 +6,9 @@ pragma solidity  ^0.8.19;
 
 import {VRFConsumerBaseV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
 import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
+import {AutomationCompatibleInterface} from "@chainlink/contracts/src/v0.8/automation/interfaces/AutomationCompatibleInterface.sol";
 
-
-contract Raffle is VRFConsumerBaseV2Plus{
+contract Raffle is VRFConsumerBaseV2Plus, AutomationCompatibleInterface {
     //errors 
     error Raffle__SendMoreToEnterRaffle();
     error  Raffle__TransferFailed();
@@ -95,12 +95,68 @@ contract Raffle is VRFConsumerBaseV2Plus{
     // get a random number 
     //  use that to pic the random user 
     //  
-    function pickWinner() external  {
+     /**
+     * @dev This is the function that the Chainlink Keeper nodes call
+     * they look for `upkeepNeeded` to return True.
+     * the following should be true for this to return true:
+     * 1. The time interval has passed between raffle runs.
+     * 2. The lottery is open.
+     * 3. The contract has ETH.
+     * 4. Implicity, your subscription is funded with LINK.
+     */     
+    function checkUpkeep(bytes memory  ) public view returns(bool upKeepNeeded, bytes memory ){
+         bool timeHasPassed = ((block.timestamp - s_lastTimeStamp) >= i_interval) ;
+        bool isOpen = s_raffleState == RaffleStates.OPEN;
+        bool hasBalance = address(this).balance >0;
+        bool hasPlayers = s_players.length>0;
+        upKeepNeeded = timeHasPassed && isOpen && hasBalance && hasPlayers;
+
+        return (upKeepNeeded, "");
+
+
+    }
+    // function pickWinner() external  {
+    //     // check if enough time has passed ;
+    //     if((block.timestamp - s_lastTimeStamp) < i_interval ) {
+    //         revert();
+
+    //     }
+    //     // get our random number 2.5
+
+    //     // 1 req RNG;
+    //     // 2 Get RNG 
+
+    //     s_raffleState = RaffleStates.CALCULATING;
+
+
+
+    //     VRFV2PlusClient.RandomWordsRequest memory request =   VRFV2PlusClient.RandomWordsRequest({
+    //             keyHash: i_keyHash,
+    //             subId: i_subscriptionId,
+    //             requestConfirmations: REQUEST_CONFIRMATIONS,
+    //             callbackGasLimit: i_callbackGasLimit,
+    //             numWords: NUM_WORDS,
+    //             extraArgs: VRFV2PlusClient._argsToBytes(
+    //                 // Set nativePayment to true to pay for VRF requests with Sepolia ETH instead of LINK
+    //                 VRFV2PlusClient.ExtraArgsV1({nativePayment: false})
+    //             )
+    //         }); 
+
+    //     requestId = s_vrfCoordinator.requestRandomWords(
+    //       request
+    //     );
+
+    // }
+
+
+    function performUpkeep(bytes calldata) external  {
         // check if enough time has passed ;
-        if((block.timestamp - s_lastTimeStamp) < i_interval ) {
+        (bool upkeepNeeded,) = checkUpkeep("");
+        if(!upkeepNeeded){
             revert();
 
         }
+
         // get our random number 2.5
 
         // 1 req RNG;
@@ -127,6 +183,9 @@ contract Raffle is VRFConsumerBaseV2Plus{
         );
 
     }
+
+
+
 
     
     //   CEI = check , effects (update the effects ) , Interactions (all the trnsactions  that happen)
